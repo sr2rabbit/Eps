@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosco - Salud Intotal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f0f4f8; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .navbar-custom { background: linear-gradient(135deg, #0f4c81, #1d70b8); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-premium { border: none; border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 76, 129, 0.06); background: white; }
+        .btn-service { padding: 20px; font-size: 1.2rem; font-weight: 600; border-radius: 14px; transition: all 0.2s; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+        .ticket-box { background: #eef9f6; border: 2px dashed #2ecc71; border-radius: 12px; }
+        .logo-nav { height: 40px; object-fit: contain; }
+        .prioridad-select { cursor: pointer; transition: all 0.2s; border: 2px solid #e2e8f0; }
+        .prioridad-select:hover { border-color: #3b82f6; background-color: #f8fafc; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-custom navbar-dark py-3 mb-4">
+    <div class="container text-center">
+        <span class="navbar-brand mb-0 h1 fw-bold fs-3 mx-auto">
+            <img src="images/logo.png" alt="Salud Intotal" class="logo-nav me-2"> KIOSCO DIGITAL DE TURNOS
+        </span>
+    </div>
+</nav>
+    
+    <h4 class="fw-bold text-center text-dark mb-3">Paso 1: Datos de Notificación (Opcional)</h4>
+<div class="mb-4">
+    <div class="input-group input-group-lg border-2 border-primary-subtle rounded-3 overflow-hidden">
+        <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-envelope-at-fill"></i></span>
+        <input type="email" class="form-control border-0" id="inputCorreo" placeholder="ejemplo@correo.com" style="font-size:1rem;">
+    </div>
+    <div class="form-text text-center text-muted">Le enviaremos una copia de su ticket digital al instante.</div>
+</div>
+
+<h4 class="fw-bold text-center text-dark mb-3">Paso 2: Seleccione su Condición</h4>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="card card-premium p-4 shadow-sm mb-4">
+                <h4 class="fw-bold text-center text-dark mb-3">Paso 1: Seleccione su Condición</h4>
+                
+                <div class="mb-4">
+                    <select class="form-select form-select-lg border-2 border-primary-subtle" id="selectPrioridad">
+                        <option value="0" selected>🟢 Turno Regular (Ninguna de las siguientes)</option>
+                        <option value="1">🤰 Embarazada / Gestante (Prioridad Media)</option>
+                        <option value="2">♿ Persona con Discapacidad / Movilidad Reducida (Prioridad Alta)</option>
+                        <option value="3">👴 Adulto Mayor (Máxima Prioridad)</option>
+                    </select>
+                </div>
+
+                <h4 class="fw-bold text-center text-dark mb-3">Paso 2: Seleccione el Servicio</h4>
+                <div class="d-grid gap-3">
+                    <button class="btn btn-outline-primary btn-service" onclick="sacarTurno('MEDICINA_GENERAL')">
+                        <span><i class="bi bi-stethoscope me-3 text-primary"></i> Medicina General</span> <i class="bi bi-arrow-right-short fs-3"></i>
+                    </button>
+                    <button class="btn btn-outline-success btn-service" onclick="sacarTurno('LABORATORIO')">
+                        <span><i class="bi bi-droplet-fill me-3 text-success"></i> Laboratorio Clínico</span> <i class="bi bi-arrow-right-short fs-3"></i>
+                    </button>
+                    <button class="btn btn-outline-warning btn-service" onclick="sacarTurno('PEDIATRIA')">
+                        <span><i class="bi bi-backpack-fill me-3 text-warning"></i> Pediatría Especializada</span> <i class="bi bi-arrow-right-short fs-3"></i>
+                    </button>
+                </div>
+
+                <div id="ticketResultado" class="mt-4 text-center d-none">
+                    <div class="ticket-box p-4 shadow-sm">
+                        <div class="text-success fw-bold small text-uppercase mb-2"><i class="bi bi-check-circle-fill"></i> Su turno ha sido registrado</div>
+                        <div class="display-4 fw-bold text-dark my-2" id="txtCodigoTicket" style="letter-spacing: 1px;">---</div>
+                        <div class="badge bg-secondary p-2 text-uppercase font-monospace mb-3" id="txtServicioTicket">---</div>
+                        <hr class="my-2 border-secondary border-opacity-25">
+                        <div class="text-muted small" id="txtFechaTicket">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const PORT = "8082"; 
+    const BASE_URL = `http://localhost:${PORT}/api`;
+
+            async function sacarTurno(servicio) {
+        const prioridad = parseInt(document.getElementById('selectPrioridad').value);
+        const correo = document.getElementById('inputCorreo').value;
+
+        const payload = {
+            servicio: servicio,
+            prioridad: prioridad,
+            correo: correo
+        };
+
+        try {
+            const response = await fetch(`${BASE_URL}/kiosco/pedir`, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json' // Especifica que se envio un JSON
+                },
+                body: JSON.stringify(payload) // Conv el objeto a texto JSON
+            });
+
+            if (!response.ok) {
+                alert("Error en las validaciones de los datos.");
+                return;
+            }
+
+            const turno = await response.json();
+
+            document.getElementById('txtCodigoTicket').innerText = turno.codigo;
+            document.getElementById('txtServicioTicket').innerText = turno.servicio.replace('_', ' ');
+            document.getElementById('txtFechaTicket').innerText = "Impresión: " + new Date().toLocaleString();
+            document.getElementById('ticketResultado').classList.remove('d-none');
+
+            document.getElementById('selectPrioridad').value = "0";
+            document.getElementById('inputCorreo').value = "";
+        } catch (error) {
+            alert("Error de red con el Kiosco.");
+        }
+    }
+</script>
+</body>
+</html>

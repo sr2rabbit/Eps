@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sala de Espera - Salud Intotal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+        .tv-screen { height: 100vh; display: flex; flex-direction: column; }
+        .tv-header { background: linear-gradient(135deg, #1e293b, #0f172a); color: #00f0ff; font-weight: bold; font-size: 2rem; border-bottom: 4px solid #334155; }
+        .logo-banner { height: 60px; object-fit: contain; }
+        .table-llamados { font-size: 2.5rem; background: #1e293b !important; }
+        .turno-highlight { font-size: 4.5rem; font-weight: 800; color: #38bdf8; font-family: monospace; }
+        .modulo-box { font-size: 3.5rem; font-weight: 700; color: #ffffff; }
+        .badge-servicio { font-size: 1.5rem; padding: 10px 20px; border-radius: 12px; text-transform: uppercase; }
+        .row-nuevo { animation: blinker 1.2s linear infinite; }
+        @keyframes blinker { 50% { background-color: #334155; } }
+    </style>
+</head>
+<body>
+
+<div class="tv-screen">
+    <div class="tv-header d-flex justify-content-between align-items-center px-5 py-3">
+        <div class="d-flex align-items-center">
+            <img src="images/logo.png" alt="Salud Intotal" class="logo-banner me-3">
+            <span>TABLERO DE ATENCIÓN DE PACIENTES</span>
+        </div>
+        <div class="badge bg-dark text-info fs-3 px-4 py-2" id="liveClock">00:00:00 PM</div>
+    </div>
+
+    <div class="flex-grow-1 p-4">
+        <div class="text-center mb-3 text-white" id="alertaAudioContainer">
+            <button class="btn btn-danger btn-lg px-5 py-3 fw-bold border border-white" onclick="conectarAudioSistema()" style="border-radius:12px; font-size:1.5rem;">
+                <i class="bi bi-volume-up-fill me-2"></i> CLIC AQUÍ PARA ACTIVAR EL SONIDO Y TIMBRE DE LA TV
+            </button>
+        </div>
+
+        <table class="table table-dark align-middle text-center h-100 m-0 table-llamados rounded-4 overflow-hidden">
+            <thead>
+                <tr class="table-secondary text-dark fs-3">
+                    <th class="py-4">CÓDIGO</th>
+                    <th class="py-4">MÓDULO / CONSULTORIO</th>
+                    <th class="py-4">SERVICIO / ESPECIALIDAD</th>
+                </tr>
+            </thead>
+            <tbody id="tablaPantalla">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const PORT = "8082"; 
+    const BASE_URL = `http://localhost:${PORT}/api`;
+    let listaCodigosLlamados = new Set();
+    let audioPermitido = false; 
+
+    function conectarAudioSistema() {
+        audioPermitido = true;
+        // Desaparecemos el contenedor de alerta de forma definitiva
+        document.getElementById('alertaAudioContainer').remove();
+        sonarTimbre(); // Confirmación auditiva
+    }
+
+    // Reloj
+    setInterval(() => {
+        document.getElementById('liveClock').innerText = new Date().toLocaleTimeString();
+    }, 1000);
+
+    // TIMBRE ELECTRÓNICO
+    function sonarTimbre() {
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            let osc1 = context.createOscillator();
+            let gain1 = context.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(587.33, context.currentTime);
+            gain1.gain.setValueAtTime(0.1, context.currentTime);
+            gain1.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.4);
+            osc1.connect(gain1); gain1.connect(context.destination);
+            osc1.start(); osc1.stop(context.currentTime + 0.4);
+
+            setTimeout(() => {
+                let osc2 = context.createOscillator();
+                let gain2 = context.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(440.00, context.currentTime);
+                gain2.gain.setValueAtTime(0.1, context.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.6);
+                osc2.connect(gain2); gain2.connect(context.destination);
+                osc2.start(); osc2.stop(context.currentTime + 0.6);
+            }, 150);
+        } catch(e) { console.error(e); }
+    }
+
+    // TEXT-TO-SPEECH
+    function hablarLlamado(codigo, numeroCaja) {
+        try {
+            let codigoSeparado = codigo.split('').join(' ').replace('-', ' ');
+            let textoAAnunciar = `Turno, ${codigoSeparado}. Dirigirse a Módulo, ${numeroCaja}`;
+            
+            let mensajeVoz = new SpeechSynthesisUtterance(textoAAnunciar);
+            mensajeVoz.lang = 'es-CO';
+            mensajeVoz.rate = 0.85;
+            mensajeVoz.pitch = 1.0;
+            
+            window.speechSynthesis.speak(mensajeVoz);
+        } catch(e) { console.error(e); }
+    }
+
+    // MONITOREO SÍNCRONO
+    async function actualizarPantalla() {
+        try {
+            const response = await fetch(`${BASE_URL}/pantalla/activos`);
+            const turnos = await response.json();
+            const tbody = document.getElementById('tablaPantalla');
+            
+            tbody.innerHTML = "";
+            
+            if (turnos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-muted py-5 fs-2 font-monospace">SALA DESPEJADA</td></tr>`;
+                return;
+            }
+
+            // Validar sonidos en base a llamados reales nuevos
+            turnos.forEach(t => {
+                if (!listaCodigosLlamados.has(t.codigo)) {
+                    if (audioPermitido) {
+                        sonarTimbre();
+                        setTimeout(() => {
+                            hablarLlamado(t.codigo, t.caja.numeroCaja);
+                        }, 800);
+                    }
+                }
+            });
+
+            listaCodigosLlamados = new Set(turnos.map(t => t.codigo));
+
+            // Pintar las filas
+            turnos.forEach(t => {
+                const esPrioritario = t.codigo.startsWith("E-") || t.codigo.startsWith("AM-") || t.codigo.startsWith("EMB-") || t.codigo.startsWith("DIS-");
+                const claseTexto = esPrioritario ? "text-warning" : "text-info";
+                
+                const fila = `
+                    <tr class="row-nuevo">
+                        <td class="py-4 turno-highlight ${claseTexto}">${t.codigo}</td>
+                        <td class="py-4 modulo-box">MÓDULO ${t.caja.numeroCaja}</td>
+                        <td class="py-4"><span class="badge ${esPrioritario ? 'bg-danger' : 'bg-primary'} badge-servicio">${t.servicio.replace('_', ' ')}</span></td>
+                    </tr>
+                `;
+                tbody.innerHTML += fila;
+            });
+            
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    }
+
+    setInterval(actualizarPantalla, 3000);
+    actualizarPantalla();
+</script>
+</body>
+</html>

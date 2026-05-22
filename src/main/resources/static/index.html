@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - EPS Salud Total</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f0f4f8; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .navbar-custom { background: linear-gradient(135deg, #0f4c81, #1d70b8); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-premium { border: none; border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 76, 129, 0.06); transition: transform 0.2s; background: white; }
+        .card-premium:hover { transform: translateY(-2px); }
+        .btn-service { padding: 18px; font-size: 1.15rem; font-weight: 600; border-radius: 12px; transition: all 0.2s; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+        .tv-screen { background: #111; border-radius: 16px; overflow: hidden; border: 4px solid #333; box-shadow: 0 12px 36px rgba(0,0,0,0.3); }
+        .tv-header { background: #222; color: #00f0ff; font-weight: bold; font-family: monospace; letter-spacing: 2px; }
+        .row-llamado { animation: blinker 1s linear 3; background-color: #1a252f !important; color: #fff !important; }
+        @keyframes blinker { 50% { background-color: #2c3e50; color: #00ffcc; } }
+        .ticket-box { background: #eef9f6; border: 2px dashed #2ecc71; border-radius: 12px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-custom navbar-dark py-3 mb-4">
+    <div class="container-fluid px-4">
+        <span class="navbar-brand mb-0 h1 fw-bold fs-3"><i class="bi bi-heart-pulse-fill me-2"></i>SNA Turnos - EPS Sanitas</span>
+        <span class="badge bg-light text-dark fw-bold px-3 py-2 rounded-pill shadow-sm" id="liveClock">00:00:00 PM</span>
+    </div>
+</nav>
+
+<div class="container-fluid px-4">
+    <div class="row g-4">
+        <div class="col-xl-4 col-lg-5">
+            <div class="card card-premium p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="p-3 bg-primary-subtle text-primary rounded-3 me-3"><i class="bi bi-sliders2 fs-3"></i></div>
+                    <div>
+                        <h4 class="m-0 fw-bold text-dark">Kiosco de Autoservicio</h4>
+                        <small class="text-muted">Asignación automática de prioridades</small>
+                    </div>
+                </div>
+                
+                <div class="form-check form-switch p-3 mb-4 rounded-3 border border-danger-subtle bg-danger-subtle bg-opacity-10">
+                    <input class="form-check-input ms-0 me-3" type="checkbox" id="checkPrioritario" style="width: 2.5em; height: 1.25em; cursor:pointer;">
+                    <label class="form-check-label fw-bold text-danger" for="checkPrioritario" style="cursor:pointer;">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Condición Prioritaria / Especial
+                    </label>
+                    <div class="text-muted small ms-5">Embarazo, discapacidad, movilidad reducida o adulto mayor.</div>
+                </div>
+
+                <div class="d-grid gap-3">
+                    <button class="btn btn-outline-primary btn-service" onclick="sacarTurno('MEDICINA_GENERAL')">
+                        <span><i class="bi bi-stethoscope me-2"></i> Medicina General</span> <i class="bi bi-arrow-right-short fs-4"></i>
+                    </button>
+                    <button class="btn btn-outline-success btn-service" onclick="sacarTurno('LABORATORIO')">
+                        <span><i class="bi bi-droplet-fill me-2"></i> Laboratorio Clínico</span> <i class="bi bi-arrow-right-short fs-4"></i>
+                    </button>
+                    <button class="btn btn-outline-warning btn-service" onclick="sacarTurno('PEDIATRIA')">
+                        <span><i class="bi bi-backpack-fill me-2"></i> Pediatría Especializada</span> <i class="bi bi-arrow-right-short fs-4"></i>
+                    </button>
+                </div>
+
+                <div id="ticketResultado" class="mt-4 text-center d-none">
+                    <div class="ticket-box p-3 shadow-sm">
+                        <div class="text-success fw-bold small text-uppercase mb-1"><i class="bi bi-check-circle-fill"></i> Ticket Registrado con éxito</div>
+                        <div class="display-5 fw-bold text-dark my-1" id="txtCodigoTicket" style="letter-spacing: 1px;">---</div>
+                        <div class="small fw-semibold text-secondary" id="txtServicioTicket">---</div>
+                        <hr class="my-2 border-secondary border-opacity-25">
+                        <div class="text-muted small" id="txtFechaTicket">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-7">
+            <div class="card card-premium p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="p-3 bg-success-subtle text-success rounded-3 me-3"><i class="bi bi-person-workspace fs-3"></i></div>
+                    <div>
+                        <h4 class="m-0 fw-bold text-dark">Panel Operativo Médico</h4>
+                        <small class="text-muted">Llamado síncrono por cubículo</small>
+                    </div>
+                </div>
+                
+                <div class="mb-4 bg-light p-3 rounded-3 border">
+                    <label class="form-label fw-bold text-secondary small text-uppercase">Identificación del Consultorio</label>
+                    <select class="form-select form-select-lg border-2 border-primary-subtle" id="selectCaja" style="font-size: 1rem;">
+                        <option value="1">🚪 Módulo 1 — Dr. Carlos Mendoza [Medicina General]</option>
+                        <option value="2">🚪 Módulo 2 — Dra. Ana María Gómez [Laboratorio]</option>
+                        <option value="3">🚪 Módulo 3 — Dr. Jorge Martínez [Pediatría]</option>
+                    </select>
+                </div>
+
+                <div class="d-grid">
+                    <button class="btn btn-success btn-lg py-3 fw-bold shadow" onclick="llamarSiguiente()" style="border-radius: 12px;">
+                        <i class="bi bi-megaphone-fill me-2"></i> LLAMAR SIGUIENTE PACIENTE
+                    </button>
+                </div>
+
+                <div id="cajaResultado" class="mt-4 text-center d-none">
+                    <div class="card bg-secondary bg-opacity-10 border p-3 rounded-3">
+                        <span class="text-muted small text-uppercase fw-bold mb-1">Paciente en atención actual</span>
+                        <div class="display-6 text-dark fw-bold" id="txtTurnoCaja">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-12">
+            <div class="tv-screen shadow-lg text-white">
+                <div class="tv-header text-center p-3 fs-5 border-bottom border-secondary">
+                    <i class="bi bi-tv-fill me-2 text-danger"></i> TABLERO DE CITAS ACTIVO
+                </div>
+                <div class="table-responsive" style="min-height: 320px; background: #1c2833;">
+                    <table class="table table-dark table-hover align-middle text-center m-0">
+                        <thead>
+                            <tr class="table-secondary text-dark uppercase small font-monospace">
+                                <th class="py-3">CÓDIGO PACIENTE</th>
+                                <th class="py-3">MÓDULO</th>
+                                <th class="py-3">ESPECIALIDAD</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaPantalla" style="font-size: 1.1rem;">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const PORT = "8082"; 
+    const BASE_URL = `http://localhost:${PORT}/api`;
+    let ultimoEstadoTurnos = ""; // Para detectar cambios y hacer sonar el timbre
+
+    // Reloj en tiempo real del sistema
+    setInterval(() => {
+        document.getElementById('liveClock').innerText = new Date().toLocaleTimeString();
+    }, 1000);
+
+    // FUNCIÓN DE SONIDO: Simula el timbre electrónico de la EPS
+    function sonarTimbre() {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Primera nota alta
+        let osc1 = context.createOscillator();
+        let gain1 = context.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, context.currentTime); // Nota D5
+        gain1.gain.setValueAtTime(0.1, context.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.4);
+        osc1.connect(gain1);
+        gain1.connect(context.destination);
+        osc1.start();
+        osc1.stop(context.currentTime + 0.4);
+
+        // Segunda nota baja armónica
+        setTimeout(() => {
+            let osc2 = context.createOscillator();
+            let gain2 = context.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(440.00, context.currentTime); // Nota A4
+            gain2.gain.setValueAtTime(0.1, context.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.6);
+            osc2.connect(gain2);
+            gain2.connect(context.destination);
+            osc2.start();
+            osc2.stop(context.currentTime + 0.6);
+        }, 150);
+    }
+
+    // 1. CONTROL DEL KIOSCO
+    async function sacarTurno(servicio) {
+        const prioritario = document.getElementById('checkPrioritario').checked;
+        try {
+            const response = await fetch(`${BASE_URL}/kiosco/pedir?servicio=${servicio}&prioritario=${prioritario}`, { method: 'POST' });
+            const turno = await response.json();
+            
+            document.getElementById('txtCodigoTicket').innerText = turno.codigo;
+            document.getElementById('txtServicioTicket').innerText = turno.servicio.replace('_', ' ');
+            document.getElementById('txtFechaTicket').innerText = "Impresión: " + new Date().toLocaleString();
+            document.getElementById('ticketResultado').classList.remove('d-none');
+            
+            document.getElementById('checkPrioritario').checked = false;
+        } catch (error) {
+            alert("Error de red. Verifica la conexión con el servidor Spring.");
+        }
+    }
+
+    // 2. CONTROL DE LA CAJA MÉDICA
+    async function llamarSiguiente() {
+        const numeroCaja = document.getElementById('selectCaja').value;
+        try {
+            const response = await fetch(`${BASE_URL}/caja/llamar/${numeroCaja}`, { method: 'POST' });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.mensaje) {
+                    alert(data.mensaje);
+                    document.getElementById('cajaResultado').classList.add('d-none');
+                } else {
+                    document.getElementById('txtTurnoCaja').innerText = data.codigo;
+                    document.getElementById('cajaResultado').classList.remove('d-none');
+                    actualizarPantalla();
+                }
+            }
+        } catch (error) {
+            alert("Error al procesar el llamado en el módulo operativo.");
+        }
+    }
+
+    // 3. MONITOR DINÁMICO DE LA SALA
+    async function actualizarPantalla() {
+        try {
+            const response = await fetch(`${BASE_URL}/pantalla/activos`);
+            const turnos = await response.json();
+            const tbody = document.getElementById('tablaPantalla');
+            
+            // Convertimos la respuesta a un string para saber si cambió algo
+            const estadoActualString = JSON.stringify(turnos);
+            
+            tbody.innerHTML = "";
+            
+            if (turnos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-muted py-4 font-monospace">SALA DESPEJADA - NO HAY LLAMADOS</td></tr>`;
+                ultimoEstadoTurnos = estadoActualString;
+                return;
+            }
+
+            // Si hay un cambio en el número de turnos o códigos, timbramos
+            if (ultimoEstadoTurnos !== "" && ultimoEstadoTurnos !== estadoActualString) {
+                sonarTimbre();
+            }
+            ultimoEstadoTurnos = estadoActualString;
+
+            turnos.forEach(t => {
+                // Si es un turno prioritario (empieza por E-), le damos un color rojo dinámico
+                const esPrioritario = t.codigo.startsWith("E-");
+                const claseTexto = esPrioritario ? "text-warning fw-bold" : "text-info fw-semibold";
+                
+                const fila = `
+                    <tr class="border-bottom border-dark border-opacity-50">
+                        <td class="py-3 fs-3 font-monospace ${claseTexto}">${t.codigo}</td>
+                        <td class="py-3 fs-4 text-white font-monospace">Módulo ${t.caja.numeroCaja}</td>
+                        <td class="py-3"><span class="badge ${esPrioritario ? 'bg-danger' : 'bg-primary'} px-3 py-2 text-uppercase font-monospace" style="font-size:0.75rem;">${t.servicio.replace('_', ' ')}</span></td>
+                    </tr>
+                `;
+                tbody.innerHTML += fila;
+            });
+        } catch (error) {
+            console.error("Fallo de sincronización de pantalla:", error);
+        }
+    }
+
+    // Pooling cíclico cada 3 segundos
+    setInterval(actualizarPantalla, 3000);
+    actualizarPantalla();
+</script>
+</body>
+</html>
